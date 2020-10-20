@@ -1,3 +1,58 @@
+Public Enum AggregateFunction
+    aggFctMin = 1
+    aggFctMax = 2
+    aggFctSum = 3
+    aggFctAvg = 4
+    accFctCount = 5
+    aggFctMedian = 6
+End Enum
+
+
+Public Function Aggregate(Index As String, AggrFunction As AggregateFunction, Optional GroupBy As String = "none") As cDataTable
+
+    Dim tOut As cDataTable
+    Dim htKeys As cHashTable
+    Dim stKey As String
+    Dim iIdx As Long
+    Set htKeys = New cHashTable
+    
+
+    'create a clone
+    Set tOut = New cDataTable
+
+    '§§§ redo all of this §§§
+
+'    RsMoveFirst
+'    Do While Not m_EOF
+'        stKey = ""
+'        For iIdx = LBound(Fields) To UBound(Fields)
+'            stKey = stKey & Item(Fields(iIdx))
+'        Next iIdx
+'        If Not htKeys.Exists(stKey) Then
+'            'add to hash table
+'            htKeys.Add stKey, 1
+'
+'            'copy data over to new table
+'            tOut.RecordAdd Record
+'        End If
+'      RsMoveNext
+'      DoEvents
+'    Loop
+
+    '§§§ redo all of this §§§
+
+    Set Aggregate = tOut
+    Set htKeys = Nothing
+
+
+End Function
+
+
+
+
+
+
+
 Private Function Percentile(ByRef tInput As cDataTable, Index As Variant, Pctl As Double, Optional bNeedsSorting As Boolean = False) As Double
 
     Dim NumElems As Double
