@@ -107,8 +107,8 @@ if __name__ == "__main__":
     """
 
     # set the path and file name
-    pdf_path = r'\\ubsprod.msad.ubs.net\groupshares\SWISS-DD\PROD_SUPP\PROJECTS\_25_Tools\17_ISO20022_Parser\Implementation Guidelines\ISO'
-    pdf_file = r'ISO20022_MDRPart2_PaymentsClearingAndSettlement_2019_2020_v1.pdf'
+    pdf_path = r'<the path>'
+    pdf_file = r'<the file>'
     pdf_file_name = pdf_path + '\\' + pdf_file
     
     # Read the pdf file
