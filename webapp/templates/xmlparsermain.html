@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section">
+    <form method="POST" action="">
+        {{ form.hidden_tag() }}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">XML Parser</legend>
+            <div class="form-group mb-3">
+                <p>Please choose the 'Load file' to pre-process the file before using the inspect function to see the
+                    content in more details</p>
+                <div class="row">
+                    <div class="col-md-6 flex-grow-1">
+                        <!-- empty cell -->
+                    </div>
+                    <div class="col-md-6 flex-grow-1">
+                        <div class="content-section">
+                            {{ form.attributehandling.label() }} <br>
+
+                            {% for subfield in form.attributehandling %}
+                            <tr>
+                                <td>{{ subfield }}</td>
+                                <td>{{ subfield.label }}</td>
+                                <td>&nbsp;&nbsp;&nbsp;</td>
+                            </tr>
+                            {% endfor %}
+
+                        </div>
+                    </div>
+
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6 flex-grow-1">
+                        {{ form.loadfile(class="btn btn-outline-info") }}
+                    </div>
+                    <div class="col-md-6 flex-grow-1">
+                        {{ form.inspectfile(class="btn btn-outline-info") }}
+                    </div>
+                </div>
+                <div class="row" style="min-height: 400px;">
+                    <div class="col-md-6 flex-grow-1 ">
+                        {% with messages = get_flashed_messages(category_filter=["load_summary"]) %}
+                        {% if messages %}
+                        <div class="text-left">Summary of loaded file:</div>
+                        <div class="card card-body bg-light">
+                            {% for message in messages %}
+                            {{ message }} <br>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    <div class="col-md-6 flex-grow-1">
+                        {% with messages = get_flashed_messages(category_filter=["inspect_text"]) %}
+                        {% if messages %}
+                        <div class="text-left">Preview of message:</div>
+                        <div class="card card-body bg-light">
+                            {% for message in messages %}
+                            {{ message }} <br>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                <div class="row justify-content-md-center pt-3">
+                    <div class="col-md-6 text-center">
+                        {{ form.buildexcel(class="btn btn-outline-info") }}
+                    </div>
+                </div>
+        </fieldset>
+    </form>
+</div>
+{% endblock content %}
+
+
+loadfile
+inspectfile
+summary
+output
