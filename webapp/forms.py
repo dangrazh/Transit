@@ -16,7 +16,17 @@ class XmlUploadForm(FlaskForm):
     sourcefile = FileField(
         "Upload source file", validators=[FileAllowed(["txt", "xml"])]
     )
-    submit = SubmitField("Upload")
+    btn_submit = SubmitField("Upload")
+
+
+class XmlSummaryForm(FlaskForm):
+    btn_details = SubmitField("Full Details")
+    btn_next = SubmitField("Next")
+
+
+class XmlFileDetailForm(FlaskForm):
+    btn_next = SubmitField("Next")
+    btn_cancel = SubmitField("Cancel")
 
 
 class XmlMainForm(FlaskForm):
@@ -31,7 +41,6 @@ class XmlMainForm(FlaskForm):
         default=1,
         coerce=int,
     )
-    loadfile = SubmitField("Load file")
     inspectfile = SubmitField("Inspect file")
     buildexcel = SubmitField("Create Excel")
     summary = TextAreaField("File summary")
@@ -41,3 +50,7 @@ class XmlMainForm(FlaskForm):
         super(XmlMainForm, self).__init__(*args, **kwargs)
         read_only(self.summary)
         read_only(self.output)
+
+
+class TabTest(FlaskForm):
+    btn_next = SubmitField("Next")

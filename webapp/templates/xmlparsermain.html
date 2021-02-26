@@ -6,12 +6,7 @@
         <fieldset class="form-group">
             <legend class="border-bottom mb-4">XML Parser</legend>
             <div class="form-group mb-3">
-                <p>Please choose the 'Load file' to pre-process the file before using the inspect function to see the
-                    content in more details</p>
                 <div class="row">
-                    <div class="col-md-6 flex-grow-1">
-                        <!-- empty cell -->
-                    </div>
                     <div class="col-md-6 flex-grow-1">
                         <div class="content-section">
                             {{ form.attributehandling.label() }} <br>
@@ -30,50 +25,72 @@
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-6 flex-grow-1">
-                        {{ form.loadfile(class="btn btn-outline-info") }}
-                    </div>
-                    <div class="col-md-6 flex-grow-1">
                         {{ form.inspectfile(class="btn btn-outline-info") }}
                     </div>
                 </div>
                 <div class="row" style="min-height: 400px;">
-                    <div class="col-md-6 flex-grow-1 ">
-                        {% with messages = get_flashed_messages(category_filter=["load_summary"]) %}
-                        {% if messages %}
-                        <div class="text-left">Summary of loaded file:</div>
-                        <div class="card card-body bg-light">
-                            {% for message in messages %}
-                            {{ message }} <br>
+                    <div class="col-md-12 flex-grow-1">
+                        {% if fp.file_processed %}
+                        <div class="text-left">Preview of message(s):</div>
+
+
+                        <ul class="nav nav-tabs">
+                            <li class="nav-item">
+                                <a href="#usage" class="nav-link active" data-toggle="tab">Usage</a>
+                            </li>
+                            {% for sample in samples %}
+                            <li class="nav-item">
+                                <a href="#{{ sample }}" class="nav-link" data-toggle="tab">{{ sample }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="usage">
+                                <h4 class="mt-2">Usage instructions</h4>
+                                <p>This function allows you to change attribute usage settings and to run the actual xml
+                                    parsing iteratively until you are happy with the output produced. Each xml document
+                                    type identified in the input file will produce one datatab on this page with the
+                                    first document being displayed. Once you run the actualExcel export, all documents
+                                    of the same type will be exported to a separate tab per document type in the Excel
+                                    file.
+                                </p>
+                            </div>
+                            {% for sample, sample_data in samples.items() %}
+                            <div class="tab-pane fade" id="{{ sample }}">
+                                <h4 class="mt-2">{{sample}}</h4>
+                                <table class="table table-sm table-hover">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th scope="col">Tag</th>
+                                            <th scope="col">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for tag, value in sample_data.items()%}
+                                        <tr>
+                                            <td>{{ tag }}</td>
+                                            <td>{{ value }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                             {% endfor %}
                         </div>
+
+
                         {% endif %}
-                        {% endwith %}
-                    </div>
-                    <div class="col-md-6 flex-grow-1">
-                        {% with messages = get_flashed_messages(category_filter=["inspect_text"]) %}
-                        {% if messages %}
-                        <div class="text-left">Preview of message:</div>
-                        <div class="card card-body bg-light">
-                            {% for message in messages %}
-                            {{ message }} <br>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                        {% endwith %}
                     </div>
                 </div>
+                {% if fp.file_processed %}
                 <div class="row justify-content-md-center pt-3">
                     <div class="col-md-6 text-center">
                         {{ form.buildexcel(class="btn btn-outline-info") }}
                     </div>
                 </div>
+                {% endif %}
+            </div>
         </fieldset>
     </form>
 </div>
 {% endblock content %}
-
-
-loadfile
-inspectfile
-summary
-output

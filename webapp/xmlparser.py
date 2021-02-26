@@ -1,20 +1,22 @@
 # ------------------
 # Imports
 # ------------------
-import sys
+# import sys
 import os
-import errno
+
+# import errno
 import datetime as dt
 import tempfile
-import pathlib
-import getpass
+
+# import pathlib
+# import getpass
 import re
 import enum
 from dataclasses import dataclass
+import pandas as pd
 
 from bs4 import BeautifulSoup as bs
 from bs4.diagnose import diagnose
-import pandas as pd
 
 
 # ------------------
@@ -45,6 +47,7 @@ class XmlParser:
         # replace the ? in the XML Prolog as this caused
         # BeautifulSoup to return a completely broken object
         if "?" in document_string:
+            # §§§ TODO: make this an regex §§§
             document_string = document_string.replace(
                 '<?xml version="1.0" encoding="ISO-8859-1"?>',
                 '<xml version="1.0" encoding="ISO-8859-1">',
@@ -55,6 +58,7 @@ class XmlParser:
         self.soup = bs(document_string, "xml")
         self.tags = self._get_tags()
         self.top_node = self.soup(self.tags[0])[0]
+        # §§§ TODO: make this configurable
         self.type = self.soup(self.tags[1])[0].name
 
         # do some basic checks post parsing
@@ -253,14 +257,18 @@ class FileProcessor:
     # Standard Functions
     # ------------------
 
-    def __init__(self, file_handle):
+    def __init__(self, source_file):
 
-        # basic attributes
-        self.file_handle = file_handle
-        self.file_full_name = file_handle.name
-        self.file_path = os.path.abspath(file_handle.name)
-        self.file_name = os.path.basename(file_handle.name)
-        self.file_name_root = os.path.splitext(self.file_name)[0]
+        with open(source_file) as file_handle:
+
+            # basic attributes
+            # self.file_handle = file_handle
+            self.file_content = file_handle.read()
+            self.file_full_name = file_handle.name
+            self.file_path = os.path.abspath(file_handle.name)
+            self.file_name = os.path.basename(file_handle.name)
+            self.file_name_root = os.path.splitext(self.file_name)[0]
+            self.line_count = self.file_content.count("\n")
 
         # get the current temporary directory
         self.temp_path = tempfile.gettempdir()
@@ -272,11 +280,9 @@ class FileProcessor:
         comp_re_xsd = re.compile(r"(<Document .*?xmlns=.*?>)")
         self.xml_identifiers["xsd"] = comp_re_xsd
 
-        # §§§ NOT YET USED - NEEDS TO BE INTEGRATED INTO PROCESS FILE §§§
         # define tags to ignore
-        #'<?xml-stylesheet type="text/xsl" href="simple.xsl" ?>'
         self.tags_to_ignore = {"script"}
-        # §§§ NOT YET USED - NEEDS TO BE INTEGRATED INTO PROCESS FILE §§§
+        # §§§ TODO: - NEEDS TO BE INTEGRATED INTO PROCESS FILE §§§
 
         # read the file into a list of single xml documents
         self.xml_source = self._split_into_documents()
@@ -341,17 +347,39 @@ class FileProcessor:
                     doc_data.append(tags_n_values)
                     self.doc_types[xml_parsed.type] = doc_data
 
-    def to_excel(self):
+    def inspect_samples(self):
+        # create the empty dict holding the output
+        doc_type_samples = {}
 
+        # loop through the full store of document types and data
+        # and return the 1st data element of each as a sample
+        for type in self.doc_types:
+            doc_type_samples[type] = self.doc_types[type][0]
+
+        return doc_type_samples
+
+    def info(self):
+        out = [
+            f"File name: {self.file_name_root}",
+            f"No of lines in file: {self.line_count}",
+            f"No of documents in file: {self.no_of_docs_in_file}",
+        ]
+        return out
+
+    def to_excel(self, out_path=None):
         # create the output
         cnt_files = 0
 
-        user = getpass.getuser()
+        # user = getpass.getuser()
         dt_now = dt.datetime.now()
         timestamp = dt_now.strftime("%Y%m%d_%H%M%S")
 
-        file_out_path = self.temp_path + "/"
-        file_out_name = f"{self.file_name_root}_{user}_{timestamp}.xlsx"
+        if out_path:
+            file_out_path = out_path + "/"
+        else:
+            file_out_path = self.temp_path + "/"
+
+        file_out_name = f"{self.file_name_root}_{timestamp}.xlsx"
         file_out = file_out_path + file_out_name
 
         # if we have output to produce, loop through the dict holding all document type lists
@@ -365,35 +393,48 @@ class FileProcessor:
                     df = pd.DataFrame(self.doc_types[item])
                     df.to_excel(writer, index=False, sheet_name=item)
                     cnt_files += 1
-            print(f"{cnt_files} data tabs created in output file!")
+            # return f"{cnt_files} data tabs created in output file!"
+            return file_out_name
         else:
-            print("No output data extracted - Excel file not created!")
+            return "No output data extracted - Excel file not created!"
 
     # ------------------
     # Internal Functions
     # ------------------
     def _split_into_documents(self):
+        list_out_tmp = []
         list_out = []
-        file_content = self.file_handle.read()
-        delims = self._get_delimiters(file_content)
+        delims = self._get_delimiters(self.file_content)
         if len(delims) > 1:
             # more than one delimiter dectectd loop and split
             # as long as there are identifiers left ->
             # construct the list as we loop through the identifiers
+            print(f"delims found: {delims}")
 
             # inital split
-            list_out = self._split_keep(file_content, delims[0])
+            list_out = self._split_keep(self.file_content, delims[0])
             # subsequent splits
             for delim in delims[1:]:
                 for item in list_out:
                     if delim in item:
                         list_tmp = self._split_keep(item, delim)
-                        list_out.extend(list_tmp)
+                        list_out_tmp.extend(list_tmp)
                     else:
                         # delim not found -> skip
                         pass
         else:
-            list_out = self._split_keep(file_content, delims[0])
+            list_out_tmp = self._split_keep(self.file_content, delims[0])
+
+        # by now we have a list that has the delimiter followed by the actual
+        # content as a pair - we need to bring them togehter again - at the same
+        # occation we remove any newline that might be in the document, so that's
+        # what comes here
+        msg = ""
+        it = iter(list_out_tmp)
+        for x, y in zip(it, it):
+            msg = f"{x}{y}"
+            msg = msg.replace("\n", "")
+            list_out.append(msg)
 
         return list_out
 
@@ -406,8 +447,8 @@ class FileProcessor:
         # the file for XML Prologs and DTD or
         # XSD patterns
         patts = set()
-        for key, comp_re in self.xml_identifiers:
-            result = comp_re.finditer(str_in)
+        for key in self.xml_identifiers:
+            result = self.xml_identifiers[key].finditer(str_in)
             if result:
                 for match in result:
                     patts.add(match.group(1))
@@ -420,107 +461,31 @@ class FileProcessor:
 # -------------------------------------------------------------------------------
 
 
-def write_log(message):
-
-    """
-    Writes the input message to the log file and sends it to the print
-    function at the same time.
-    """
-
-    dt_now = dt.datetime.now()
-    str_now = dt_now.strftime("%Y-%m-%d %H:%M:%S")
-    message = str_now + "   " + message
-
-    # tell it on the console
-    print(message)
-
-    # write it to the log
-
-    # get the current temporary directory
-    tmpdir = tempfile.gettempdir()
-
-    # Open the log file
-    fileoutname = f"{tmpdir}\\WebDownload.log"
-    file_out = open(fileoutname, "a+")
-    file_out.write(message + "\n")
-
-    # Close opend file
-    file_out.close()
-
-
-def remove_old_log():
-
-    """
-    Function to remove any old log file
-    """
-
-    # get the current temporary directory
-    tmpdir = tempfile.gettempdir()
-
-    # build the log file name
-    fileoutname = f"{tmpdir}\\WebDownload.log"
-
-    # now remove it if exists
-    silent_remove(fileoutname)
-
-
-def silent_remove(filename):
-
-    """
-    Function to remove a given file if exists
-    """
-
-    # try to remove the file
-    try:
-        os.remove(filename)
-
-    # if there was an error, raise it if its not "the no such file or directory" error
-    except OSError as e:
-        if e.errno != errno.ENOENT:  # errno.ENOENT = no such file or directory
-            raise  # re-raise exception if a different error occurred
-
-
-def file_exists(file_path_name):
-
-    """
-    Checks if a file exists and returns a boolean value indicating the same
-    """
-
-    # check if file exists and return true or false
-    my_file = pathlib.Path(file_path_name)
-    return bool(my_file.is_file())
-
-
-# -------------------------------------------------------------------------------
-# Specific Service Functions
-# -------------------------------------------------------------------------------
-
-# none for now
-
-# -------------------------------------------------------------------------------
-# Main Processing
-# -------------------------------------------------------------------------------
-
-# not separated from script entry point for now
-
-
 # -------------------------------------------------------------------------------
 # The script entry point
 # -------------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
-    path_name = "<here goes the path >"
-    # file_name = 'SYSTEM.DEAD.LETTER.QUEUE_single_xml_per_line_V2.txt'
-    file_name = "<here goes the file name>"
-    # file_name = 'SmallSample.txt'
+    path_name = "P:\\Programming\\Python\\xml_examples\\"
+    file_name = "camt.054_sweden.xml"
+    # file_name = "pain.008.sepa.xml"
     file_in = path_name + file_name
 
-    with open(file_in) as f_in:
-        # load the file into the file processor
-        fp = FileProcessor(f_in)
+    # with open(file_in) as f_in:
+    # load the file into the file processor
+    fp = FileProcessor(file_in)
 
-        # get the basic information for the file
-        print(fp)
-        # parse the file into the
-        fp.process_file
+    # get the basic information for the file
+    print(f"FileProcessor object:\n{fp}")
+
+    # parse the documents within the file
+    # this is where the actual XML processing happens
+    fp.process_file()
+
+    # get the samples - this returns a dict with
+    # the 1st document of each document tpye in the file
+    print(f"Inspect Sample:\n{fp.inspect_samples()}")
+
+    # export the parsed documents to the excel file
+    # fp.to_excel()
