@@ -1,0 +1,13 @@
+Flask
+Flask-SQLAlchemy
+Werkzeug
+Flask-WTF
+Flask-KVSession
+WTForms
+WTForms-Components
+email-validator
+pandas
+beautifulsoup4
+lxml
+xlsxwriter
+pyyaml
