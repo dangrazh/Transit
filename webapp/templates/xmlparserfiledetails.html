@@ -8,9 +8,6 @@
             <div class="row">
                 <div class="col-md-3">
                     <div class="text-left mb-3">Summary of loaded file:</div>
-                    <!--                    <div class="card card-body bg-light">
-                        <p class="card-text"><small class="text-muted">
--->
                     <table class="table table-smallfont table-sm table-hover">
                         <tbody>
                             {% for attr in fp.info() %}
@@ -20,44 +17,42 @@
                             {% endfor %}
                         </tbody>
                     </table>
-                    <!--                         </small></p>
-                    </div>
--->
                 </div>
                 <div class="col-md-8">
                     <div class="text-left mb-3">File details:</div>
-                    <!--                    <div class="card card-body bg-light">
-                        <p class="card-text"><small class="text-muted">
--->
                     <table class="table table-smallfont table-sm table-hover">
                         <tbody>
-
                             {% set debug_info = fp.debug_info() %}
                             {% for attr, value in debug_info.items() %}
                             <tr>
                                 <td>{{attr}}</td>
                                 <td>{{value}}</td>
                             </tr>
-                            <!-- {{ attr }} &nbsp;->&nbsp; {{ value }} <br> -->
                             {% endfor %}
                         </tbody>
                     </table>
-
-                    <!--
-                            </small></p>
-                    </div>
--->
                 </div>
             </div>
             <div class="form-group">
                 {% if fp.file_processed %}
                 <div class="row">
-                    <div class="col-md-6 flex-grow-1">
-                        <div class="text-left mb-3">Process log:</div>
-                        {% for logentry in fp.process_log %}
-                        {{ logentry }}<br>
-                        {% endfor %}
-                    </div>
+                    <div class="text-left mb-3">Process log:</div>
+                    <table class="table table-smallfont table-sm table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Log entry</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for logentry in fp.process_log %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ logentry }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
                 {% endif %}
                 <div class="row pt-3">
@@ -82,15 +77,6 @@
                             {% endfor %}
                         </tbody>
                     </table>
-
-                    <!--                    <div class="col-md-6 flex-grow-1">
-                        <div class="card card-body bg-light">
-                            <p class="card-text"><small class="text-muted">
-                                    {{ doc }}
-                                </small></p>
-                        </div>
-                    </div>
--->
                 </div>
                 <div class="row justify-content-md-center pt-3">
                     <div class="col-md-6 text-center">
