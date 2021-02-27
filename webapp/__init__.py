@@ -34,5 +34,6 @@ app_config = config.get_full_config()
 
 APP_TITLE = app_config["Application"]["Title"]
 APP_VERSION = app_config["Application"]["Version"]
+APP_AUTHOR = app_config["Application"]["Developer"]
 
 from webapp import routes

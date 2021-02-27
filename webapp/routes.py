@@ -12,10 +12,9 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from webapp import app
-from webapp import APP_TITLE
-from webapp import APP_VERSION
+from webapp import APP_TITLE, APP_VERSION, APP_AUTHOR
+
 from webapp.forms import (
-    TabTest,
     XmlFileDetailForm,
     XmlMainForm,
     XmlSummaryForm,
@@ -35,7 +34,11 @@ def home():
 @app.route("/about")
 def about():
     return render_template(
-        "about.html", app_title=APP_TITLE, app_version=APP_VERSION, title="About"
+        "about.html",
+        app_title=APP_TITLE,
+        app_version=APP_VERSION,
+        app_author=APP_AUTHOR,
+        title="About",
     )
 
 
@@ -193,17 +196,4 @@ def xmlparsermain():
         fp=fp,
         samples=samples,
         # parsed=parsed,
-    )
-
-
-@app.route("/tabs", methods=["GET", "POST"])
-def tabs():
-
-    form = TabTest()
-
-    return render_template(
-        "tabtest.html",
-        app_title=APP_TITLE,
-        title="XML Parser",
-        form=form,
     )

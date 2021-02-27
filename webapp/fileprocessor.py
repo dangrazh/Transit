@@ -103,7 +103,6 @@ class FileProcessor:
             try:
                 xml_parsed = XmlParser(xml_doc)
             except ValueError as e:
-                # pass
                 # print(
                 #     f"ERROR: skipping document #{index} due to the following error: {e}"
                 # )
@@ -111,6 +110,12 @@ class FileProcessor:
                     f"ERROR: skipping document #{index} due to the following error: {e}"
                 )
                 out = "error"
+            except IndexError as e:
+                self.process_log.append(
+                    f"ERROR: parsinng document #{index} failed due to the following error: {e}"
+                )
+                out = "error"
+                return out
             else:
                 # print(f"INFO: document #{index} successfully loaded")
                 self.process_log.append(f"INFO: document #{index} successfully loaded")

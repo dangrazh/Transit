@@ -50,7 +50,3 @@ class XmlMainForm(FlaskForm):
         super(XmlMainForm, self).__init__(*args, **kwargs)
         read_only(self.summary)
         read_only(self.output)
-
-
-class TabTest(FlaskForm):
-    btn_next = SubmitField("Next")

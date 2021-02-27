@@ -58,8 +58,14 @@ class XmlParser:
         self.soup = bs(document_string, "xml")
         self.tags = self._get_tags()
         self.top_node = self.soup(self.tags[0])[0]
-        # §§§ TODO: make this configurable
-        self.type = self.soup(self.tags[1])[0].name
+        # TODO: make this configurable
+        # TODO: build error handling
+        try:
+            self.type = self.soup(self.tags[1])[0].name
+        except IndexError as e:
+            raise IndexError(
+                f"Index out of range occurred while trying to access 'self.soup(self.tags[1])[0].name'\nInput string processed: {document_string}\nParsed result: {self.soup}\nTags identified: {self.tags}"
+            )
 
         # do some basic checks post parsing
         self.source_no_of_tags = document_string.count("</")
