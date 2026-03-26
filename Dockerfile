@@ -20,6 +20,8 @@ RUN dnf -y update && \
         gcc \
         gcc-c++ \
         git \
+        clang \
+        llvm \        
         make && \
     dnf clean all && \
     rm -rf /var/cache/dnf
