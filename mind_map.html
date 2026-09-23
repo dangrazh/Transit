@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mind Map</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --panel:#ffffff; --ink:#1d2230; --muted:#6b7385;
+    --line:#d9dce6; --accent:#3d6df5; --danger:#d9534f;
+    --shadow:0 2px 10px rgba(20,25,45,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#14161d; --panel:#1c1f29; --ink:#e8eaf2; --muted:#98a0b5;
+           --line:#2c3040; --accent:#5b8bff; --shadow:0 2px 12px rgba(0,0,0,.45); }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{
+    flex:0 0 auto; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+    box-shadow:var(--shadow); z-index:2;
+  }
+  h1{font-size:15px;margin:0 10px 0 0;font-weight:650;letter-spacing:.2px;white-space:nowrap}
+  #text{
+    flex:1 1 220px; min-width:140px; padding:8px 10px; border-radius:8px;
+    border:1px solid var(--line); background:var(--bg); color:var(--ink); font:inherit;
+  }
+  #text:focus{outline:2px solid var(--accent); outline-offset:-1px}
+  button{
+    padding:8px 12px; border-radius:8px; border:1px solid var(--line);
+    background:var(--bg); color:var(--ink); font:inherit; cursor:pointer; white-space:nowrap;
+  }
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  button.danger:hover{border-color:var(--danger); color:var(--danger)}
+  .sep{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
+  #stage{flex:1 1 auto; position:relative; min-height:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:default}
+  #hint{
+    position:absolute; left:14px; bottom:12px; color:var(--muted); font-size:12px;
+    pointer-events:none; max-width:min(560px,calc(100% - 28px));
+  }
+  #status{
+    position:absolute; right:14px; bottom:12px; color:var(--muted); font-size:12px;
+    pointer-events:none;
+  }
+  #editor{
+    position:absolute; display:none; padding:6px 9px; border-radius:8px;
+    border:2px solid var(--accent); background:var(--panel); color:var(--ink);
+    font:inherit; text-align:center; box-shadow:var(--shadow); z-index:3;
+  }
+  @media (max-width:640px){ h1{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mind Map</h1>
+  <input id="text" placeholder="Type an idea, press Enter" autocomplete="off">
+  <button id="add" class="primary">Add</button>
+  <button id="addSibling">Add sibling</button>
+  <span class="sep"></span>
+  <button id="rename">Rename</button>
+  <button id="del" class="danger">Delete</button>
+  <span class="sep"></span>
+  <button id="relayout">Re-layout</button>
+  <button id="fit">Fit to screen</button>
+  <span class="sep"></span>
+  <button id="save">Export</button>
+  <button id="load">Import</button>
+  <button id="png">PNG</button>
+  <button id="clear" class="danger">Clear</button>
+  <input type="file" id="file" accept="application/json" hidden>
+</header>
+
+<div id="stage">
+  <canvas id="c"></canvas>
+  <input id="editor" spellcheck="false">
+  <div id="hint"></div>
+  <div id="status"></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------------- state ---------------- */
+
+const LS_KEY = "mindmap.v1";
+let nodes = [];          // {id, text, parent, x, y, vx, vy, w, h, pinned}
+let selected = null;     // node id
+let seq = 1;
+let alpha = 1;           // simulation energy
+
+const view = { x: 0, y: 0, k: 1, tx: 0, ty: 0, tk: 1 };   // current + target transform
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const editor = document.getElementById("editor");
+const hintEl = document.getElementById("hint");
+const statusEl = document.getElementById("status");
+const textInput = document.getElementById("text");
+
+const byId = id => nodes.find(n => n.id === id);
+const childrenOf = id => nodes.filter(n => n.parent === id);
+const roots = () => nodes.filter(n => n.parent === null);
+
+function depthOf(n){ let d = 0; let guard = 0; while (n && n.parent !== null && guard++ < 999){ n = byId(n.parent); d++; } return d; }
+
+/* ---------------- node geometry ---------------- */
+
+const FONT = w => w + " 14px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const weightFor = d => d === 0 ? 650 : d === 1 ? 600 : 400;
+
+function measure(n){
+  const d = depthOf(n);
+  ctx.font = FONT(weightFor(d));
+  const pad = d === 0 ? 20 : 14;
+  n.w = Math.min(240, Math.max(58, ctx.measureText(n.text).width + pad * 2));
+  n.h = d === 0 ? 40 : 32;
+}
+function measureAll(){ nodes.forEach(measure); }
+
+/* ---------------- editing the graph ---------------- */
+
+function addNode(text, parent){
+  text = (text || "").trim();
+  if (!text) return null;
+  const p = parent != null ? byId(parent) : null;
+  const sibs = childrenOf(p ? p.id : null);
+  // seed near the parent, fanned out by the golden angle so the sim untangles fast
+  const ang = sibs.length * 2.399 + (p ? Math.atan2(p.y, p.x) : 0);
+  const r = p ? 130 : 200;
+  const n = {
+    id: seq++, text,
+    parent: p ? p.id : null,
+    x: (p ? p.x : 0) + Math.cos(ang) * r,
+    y: (p ? p.y : 0) + Math.sin(ang) * r,
+    vx: 0, vy: 0, w: 80, h: 32, pinned: false
+  };
+  nodes.push(n);
+  measure(n);
+  selected = n.id;
+  alpha = 1;
+  persist();
+  return n;
+}
+
+function removeSubtree(id){
+  const doomed = new Set([id]);
+  let grew = true;
+  while (grew){
+    grew = false;
+    for (const n of nodes)
+      if (n.parent !== null && doomed.has(n.parent) && !doomed.has(n.id)){ doomed.add(n.id); grew = true; }
+  }
+  const target = byId(id);
+  const parent = target ? target.parent : null;
+  nodes = nodes.filter(n => !doomed.has(n.id));
+  selected = parent !== null && byId(parent) ? parent : (nodes[0] ? nodes[0].id : null);
+  alpha = 1;
+  persist();
+}
+
+function reseed(){
+  // scatter everything around its parent again and let the simulation rebuild
+  for (const n of nodes){
+    const p = n.parent !== null ? byId(n.parent) : null;
+    const a = Math.random() * Math.PI * 2;
+    const r = p ? 100 + Math.random() * 60 : Math.random() * 40;
+    n.x = (p ? p.x : 0) + Math.cos(a) * r;
+    n.y = (p ? p.y : 0) + Math.sin(a) * r;
+    n.vx = n.vy = 0;
+    n.pinned = false;
+  }
+  alpha = 1;
+}
+
+/* ---------------- force simulation ---------------- */
+
+function linkDistance(a, b){
+  const d = Math.max(depthOf(a), depthOf(b));
+  const base = d <= 1 ? 170 : d === 2 ? 135 : 110;
+  return base + (a.w + b.w) / 6;
+}
+
+function step(){
+  if (alpha < 0.005 || nodes.length === 0) return;
+  const n = nodes.length;
+
+  // repulsion between every pair, scaled by node size
+  for (let i = 0; i < n; i++){
+    const a = nodes[i];
+    for (let j = i + 1; j < n; j++){
+      const b = nodes[j];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let d2 = dx * dx + dy * dy;
+      if (d2 < 0.01){ dx = Math.random() - .5; dy = Math.random() - .5; d2 = 0.01; }
+      const d = Math.sqrt(d2);
+      const size = (a.w + b.w + a.h + b.h) / 4;
+      const f = (2600 + size * 120) / d2;
+      const fx = dx / d * f, fy = dy / d * f;
+      a.vx -= fx; a.vy -= fy;
+      b.vx += fx; b.vy += fy;
+    }
+  }
+
+  // springs along edges
+  for (const b of nodes){
+    if (b.parent === null) continue;
+    const a = byId(b.parent);
+    if (!a) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.hypot(dx, dy) || 0.01;
+    const f = (d - linkDistance(a, b)) * 0.045;
+    const fx = dx / d * f, fy = dy / d * f;
+    a.vx += fx; a.vy += fy;
+    b.vx -= fx; b.vy -= fy;
+  }
+
+  // push apart boxes that still overlap, so every label stays readable
+  for (let i = 0; i < n; i++){
+    const a = nodes[i];
+    for (let j = i + 1; j < n; j++){
+      const b = nodes[j];
+      const ox = (a.w + b.w) / 2 + 22 - Math.abs(b.x - a.x);
+      const oy = (a.h + b.h) / 2 + 16 - Math.abs(b.y - a.y);
+      if (ox > 0 && oy > 0){
+        if (ox < oy){
+          const s = (b.x >= a.x ? 1 : -1) * ox * 0.25;
+          a.x -= s; b.x += s;
+        } else {
+          const s = (b.y >= a.y ? 1 : -1) * oy * 0.25;
+          a.y -= s; b.y += s;
+        }
+      }
+    }
+  }
+
+  // gentle pull toward the origin keeps the map compact
+  for (const nd of nodes){
+    nd.vx -= nd.x * 0.0022;
+    nd.vy -= nd.y * 0.0022;
+  }
+
+  // single root anchors at the centre; several roots spread on a ring
+  const rs = roots();
+  rs.forEach((r, i) => {
+    const a = i / Math.max(1, rs.length) * Math.PI * 2;
+    const tx = rs.length === 1 ? 0 : Math.cos(a) * 260;
+    const ty = rs.length === 1 ? 0 : Math.sin(a) * 260;
+    r.vx += (tx - r.x) * 0.06;
+    r.vy += (ty - r.y) * 0.06;
+  });
+
+  for (const nd of nodes){
+    if (nd.pinned){ nd.vx = nd.vy = 0; continue; }
+    nd.vx *= 0.80; nd.vy *= 0.80;
+    const sp = Math.hypot(nd.vx, nd.vy);
+    if (sp > 30){ nd.vx = nd.vx / sp * 30; nd.vy = nd.vy / sp * 30; }
+    nd.x += nd.vx * alpha;
+    nd.y += nd.vy * alpha;
+  }
+
+  alpha *= 0.985;
+}
+
+/* ---------------- view fitting ---------------- */
+
+let autoFit = true;
+
+function bounds(){
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of nodes){
+    x0 = Math.min(x0, n.x - n.w / 2); x1 = Math.max(x1, n.x + n.w / 2);
+    y0 = Math.min(y0, n.y - n.h / 2); y1 = Math.max(y1, n.y + n.h / 2);
+  }
+  return { x0, y0, x1, y1 };
+}
+
+function fitToScreen(instant){
+  if (!nodes.length){ view.tx = 0; view.ty = 0; view.tk = 1; if (instant) snap(); return; }
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const b = bounds(), pad = 52;
+  const k = Math.min((W - pad * 2) / Math.max(1, b.x1 - b.x0),
+                     (H - pad * 2) / Math.max(1, b.y1 - b.y0), 1.25);
+  view.tk = Math.max(0.1, k);
+  view.tx = W / 2 - (b.x0 + b.x1) / 2 * view.tk;
+  view.ty = H / 2 - (b.y0 + b.y1) / 2 * view.tk;
+  if (instant) snap();
+}
+function snap(){ view.x = view.tx; view.y = view.ty; view.k = view.tk; }
+
+function easeView(){
+  view.x += (view.tx - view.x) * 0.16;
+  view.y += (view.ty - view.y) * 0.16;
+  view.k += (view.tk - view.k) * 0.16;
+}
+
+const toWorld = (px, py) => ({ x: (px - view.x) / view.k, y: (py - view.y) / view.k });
+
+/* ---------------- rendering ---------------- */
+
+const PALETTE = ["#3d6df5","#e0693c","#129c88","#a05ad6","#d5a017","#d9534f","#2f8fd6","#5a9c3a"];
+
+function branchColor(n){
+  // every top-level branch owns a hue, inherited by its whole subtree
+  let cur = n, prev = n, guard = 0;
+  while (cur.parent !== null && guard++ < 999){ prev = cur; cur = byId(cur.parent) || cur; if (cur === prev) break; }
+  if (prev === cur) return PALETTE[0];
+  const idx = childrenOf(cur.id).indexOf(prev);
+  return PALETTE[(idx < 0 ? 0 : idx) % PALETTE.length];
+}
+
+function path(g, x, y, w, h, r){
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// renders the whole map into any 2d context; also used for PNG export
+function render(g, opts){
+  const clip = opts.clipLabels !== false;
+  g.save();
+  g.translate(opts.x, opts.y);
+  g.scale(opts.k, opts.k);
+
+  g.lineCap = "round";
+  for (const n of nodes){
+    if (n.parent === null) continue;
+    const p = byId(n.parent);
+    if (!p) continue;
+    g.strokeStyle = branchColor(n);
+    g.globalAlpha = 0.55;
+    g.lineWidth = Math.max(1.4, 5 - depthOf(n) * 1.1);
+    const mx = (p.x + n.x) / 2, my = (p.y + n.y) / 2;
+    g.beginPath();
+    g.moveTo(p.x, p.y);
+    g.quadraticCurveTo(mx, p.y + (my - p.y) * 0.25, n.x, n.y);
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+
+  const inkC = css("--ink"), panelC = css("--panel"), accentC = css("--accent");
+  for (const n of nodes){
+    const d = depthOf(n), col = branchColor(n);
+    const x = n.x - n.w / 2, y = n.y - n.h / 2, r = n.h / 2;
+
+    g.save();
+    g.shadowColor = "rgba(15,20,40,.18)";
+    g.shadowBlur = 8; g.shadowOffsetY = 2;
+    path(g, x, y, n.w, n.h, r);
+    g.fillStyle = d === 0 ? col : panelC;
+    g.fill();
+    g.restore();
+
+    path(g, x, y, n.w, n.h, r);
+    g.lineWidth = (opts.showSelection && n.id === selected) ? 3 : (d === 0 ? 0 : 2);
+    g.strokeStyle = (opts.showSelection && n.id === selected) ? accentC : col;
+    if (g.lineWidth) g.stroke();
+
+    g.fillStyle = d === 0 ? "#fff" : inkC;
+    g.font = FONT(weightFor(d));
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    let label = n.text;
+    if (clip && g.measureText(label).width > n.w - 16){
+      while (label.length > 1 && g.measureText(label + "…").width > n.w - 16) label = label.slice(0, -1);
+      label += "…";
+    }
+    g.fillText(label, n.x, n.y + 0.5);
+  }
+  g.restore();
+}
+
+function draw(){
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)){
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  render(ctx, { x: view.x, y: view.y, k: view.k, showSelection: true });
+
+  const sel = byId(selected);
+  hintEl.textContent = nodes.length === 0
+    ? "Type an idea and press Enter to create the central topic."
+    : "Adding under: “" + (sel ? sel.text : "—") + "”  ·  Enter = child · Shift+Enter = sibling · double-click = rename · drag = move · Del = remove · scroll = zoom";
+  statusEl.textContent = nodes.length + " node" + (nodes.length === 1 ? "" : "s") + " · " + Math.round(view.k * 100) + "%";
+}
+
+function loop(){
+  step();
+  if (autoFit && !dragging) fitToScreen(false);
+  easeView();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- interaction ---------------- */
+
+let dragging = null, dragDX = 0, dragDY = 0, panning = null;
+
+function nodeAt(px, py){
+  const w = toWorld(px, py);
+  for (let i = nodes.length - 1; i >= 0; i--){
+    const n = nodes[i];
+    if (Math.abs(w.x - n.x) <= n.w / 2 && Math.abs(w.y - n.y) <= n.h / 2) return n;
+  }
+  return null;
+}
+const localPos = e => {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+};
+
+canvas.addEventListener("pointerdown", e => {
+  hideEditor(true);
+  const p = localPos(e);
+  const n = nodeAt(p.x, p.y);
+  canvas.setPointerCapture(e.pointerId);
+  if (n){
+    selected = n.id;
+    dragging = n;
+    n.pinned = true;
+    const w = toWorld(p.x, p.y);
+    dragDX = n.x - w.x; dragDY = n.y - w.y;
+    autoFit = false;
+  } else {
+    panning = { px: p.x, py: p.y, vx: view.x, vy: view.y };
+    autoFit = false;
+  }
+  canvas.style.cursor = "grabbing";
+});
+
+canvas.addEventListener("pointermove", e => {
+  const p = localPos(e);
+  if (dragging){
+    const w = toWorld(p.x, p.y);
+    dragging.x = w.x + dragDX;
+    dragging.y = w.y + dragDY;
+    dragging.vx = dragging.vy = 0;
+    alpha = Math.max(alpha, 0.35);
+  } else if (panning){
+    view.tx = view.x = panning.vx + (p.x - panning.px);
+    view.ty = view.y = panning.vy + (p.y - panning.py);
+  } else {
+    canvas.style.cursor = nodeAt(p.x, p.y) ? "grab" : "default";
+  }
+});
+
+function endPointer(){
+  if (dragging){ dragging.pinned = false; persist(); }
+  dragging = null; panning = null;
+  canvas.style.cursor = "default";
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
+
+canvas.addEventListener("dblclick", e => {
+  const n = nodeAt(localPos(e).x, localPos(e).y);
+  if (n) showEditor(n);
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  autoFit = false;
+  const p = localPos(e);
+  const before = toWorld(p.x, p.y);
+  const k = Math.min(3, Math.max(0.1, view.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  view.k = view.tk = k;
+  view.x = view.tx = p.x - before.x * k;
+  view.y = view.ty = p.y - before.y * k;
+}, { passive: false });
+
+/* inline rename */
+let editing = null;
+function showEditor(n){
+  editing = n;
+  editor.value = n.text;
+  editor.style.display = "block";
+  const sw = Math.max(130, n.w * view.k);
+  editor.style.width = sw + "px";
+  editor.style.left = (view.x + n.x * view.k - sw / 2) + "px";
+  editor.style.top = (view.y + n.y * view.k - 17) + "px";
+  editor.focus();
+  editor.select();
+}
+function hideEditor(commit){
+  if (editing && commit){
+    const t = editor.value.trim();
+    if (t){ editing.text = t; measure(editing); alpha = Math.max(alpha, 0.3); persist(); }
+  }
+  editing = null;
+  editor.style.display = "none";
+}
+editor.addEventListener("keydown", e => {
+  if (e.key === "Enter"){ e.preventDefault(); hideEditor(true); }
+  if (e.key === "Escape"){ e.preventDefault(); hideEditor(false); }
+});
+editor.addEventListener("blur", () => hideEditor(true));
+
+/* keyboard */
+document.addEventListener("keydown", e => {
+  if (document.activeElement === textInput || document.activeElement === editor) return;
+  if ((e.key === "Delete" || e.key === "Backspace") && selected !== null){
+    e.preventDefault();
+    removeSubtree(selected);
+  }
+  if (e.key === "F2"){
+    const n = byId(selected);
+    if (n){ e.preventDefault(); showEditor(n); }
+  }
+});
+
+/* ---------------- toolbar ---------------- */
+
+function addFromInput(sibling){
+  const t = textInput.value.trim();
+  if (!t){ textInput.focus(); return; }
+  const sel = byId(selected);
+  const parent = !sel ? null : (sibling ? sel.parent : sel.id);
+  addNode(t, parent);
+  textInput.value = "";
+  textInput.focus();
+  autoFit = true;
+}
+
+textInput.addEventListener("keydown", e => {
+  if (e.key === "Enter"){ e.preventDefault(); addFromInput(e.shiftKey); }
+});
+document.getElementById("add").onclick = () => addFromInput(false);
+document.getElementById("addSibling").onclick = () => addFromInput(true);
+document.getElementById("rename").onclick = () => { const n = byId(selected); if (n) showEditor(n); };
+document.getElementById("del").onclick = () => { if (selected !== null) removeSubtree(selected); };
+document.getElementById("relayout").onclick = () => { reseed(); autoFit = true; };
+document.getElementById("fit").onclick = () => { autoFit = true; fitToScreen(false); };
+
+document.getElementById("clear").onclick = () => {
+  if (!nodes.length || confirm("Delete the whole mind map?")){
+    nodes = []; selected = null; seq = 1; alpha = 0; persist();
+  }
+};
+
+function download(href, name){
+  const a = document.createElement("a");
+  a.href = href; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+document.getElementById("save").onclick = () => {
+  const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  download(url, "mindmap.json");
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+const fileInput = document.getElementById("file");
+document.getElementById("load").onclick = () => fileInput.click();
+fileInput.onchange = () => {
+  const f = fileInput.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      hydrate(JSON.parse(r.result));
+      autoFit = true; alpha = 1; persist();
+    }catch(err){
+      alert("That file could not be read as a mind map.");
+    }
+    fileInput.value = "";
+  };
+  r.readAsText(f);
+};
+
+document.getElementById("png").onclick = () => {
+  if (!nodes.length) return;
+  const b = bounds(), pad = 40, scale = 2;
+  const W = b.x1 - b.x0 + pad * 2, H = b.y1 - b.y0 + pad * 2;
+  const out = document.createElement("canvas");
+  out.width = Math.round(W * scale);
+  out.height = Math.round(H * scale);
+  const g = out.getContext("2d");
+  g.setTransform(scale, 0, 0, scale, 0, 0);
+  g.fillStyle = css("--panel");
+  g.fillRect(0, 0, W, H);
+  render(g, { x: -b.x0 + pad, y: -b.y0 + pad, k: 1, showSelection: false, clipLabels: false });
+  download(out.toDataURL("image/png"), "mindmap.png");
+};
+
+/* ---------------- persistence ---------------- */
+
+const serialize = () => ({
+  version: 1, seq, selected,
+  nodes: nodes.map(n => ({ id: n.id, text: n.text, parent: n.parent, x: Math.round(n.x), y: Math.round(n.y) }))
+});
+
+function persist(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(serialize())); }
+  catch(e){ /* storage may be unavailable */ }
+}
+
+function hydrate(data){
+  if (!data || !Array.isArray(data.nodes)) throw new Error("not a mind map");
+  nodes = data.nodes.map(n => ({
+    id: n.id,
+    text: String(n.text == null ? "" : n.text),
+    parent: n.parent == null ? null : n.parent,
+    x: Number(n.x) || 0, y: Number(n.y) || 0,
+    vx: 0, vy: 0, w: 80, h: 32, pinned: false
+  }));
+  const ids = new Set(nodes.map(n => n.id));
+  for (const n of nodes) if (n.parent !== null && !ids.has(n.parent)) n.parent = null;
+  seq = nodes.length ? Math.max.apply(null, nodes.map(n => n.id)) + 1 : 1;
+  selected = ids.has(data.selected) ? data.selected : (nodes[0] ? nodes[0].id : null);
+  measureAll();
+}
+
+function restore(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw){ hydrate(JSON.parse(raw)); return true; }
+  }catch(e){ /* fall through to the demo map */ }
+  return false;
+}
+
+function demo(){
+  const root = addNode("My Mind Map", null);
+  const ideas = addNode("Ideas", root.id);
+  addNode("Brainstorm", ideas.id);
+  addNode("Research", ideas.id);
+  const tasks = addNode("Tasks", root.id);
+  addNode("Draft", tasks.id);
+  addNode("Review", tasks.id);
+  addNode("Notes", root.id);
+  selected = root.id;
+}
+
+window.addEventListener("resize", () => { if (autoFit) fitToScreen(false); });
+
+if (!restore()) demo();
+measureAll();
+fitToScreen(true);
+textInput.focus();
+loop();
+
+})();
+</script>
+</body>
+</html>
