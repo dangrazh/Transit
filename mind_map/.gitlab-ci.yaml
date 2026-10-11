@@ -1,0 +1,12 @@
+# Publishes mind_map.html as a static site via GitLab Pages.
+pages:
+  image: alpine:latest
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp mind_map.html public/index.html
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
