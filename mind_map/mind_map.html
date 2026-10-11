@@ -184,14 +184,33 @@ function addNode(text, parent){
   return n;
 }
 
-function removeSubtree(id){
-  const doomed = new Set([id]);
+function subtreeIds(id){
+  const ids = new Set([id]);
   let grew = true;
   while (grew){
     grew = false;
     for (const n of nodes)
-      if (n.parent !== null && doomed.has(n.parent) && !doomed.has(n.id)){ doomed.add(n.id); grew = true; }
+      if (n.parent !== null && ids.has(n.parent) && !ids.has(n.id)){ ids.add(n.id); grew = true; }
   }
+  return ids;
+}
+
+function reparent(n, parent){
+  n.parent = parent.id;
+  n.pinned = false;
+  subtreeIds(n.id).forEach(id => measure(byId(id)));   // depth changed, so font/size may too
+  // move it off the new parent, pointing away from the grandparent, and let the layout settle it
+  const gp = parent.parent !== null ? byId(parent.parent) : null;
+  const ang = gp ? Math.atan2(parent.y - gp.y, parent.x - gp.x) + (Math.random() - .5)
+                 : Math.random() * Math.PI * 2;
+  n.x = parent.x + Math.cos(ang) * 120;
+  n.y = parent.y + Math.sin(ang) * 120;
+  n.vx = n.vy = 0;
+  alpha = 1;
+}
+
+function removeSubtree(id){
+  const doomed = subtreeIds(id);
   const target = byId(id);
   const parent = target ? target.parent : null;
   nodes = nodes.filter(n => !doomed.has(n.id));
@@ -263,13 +282,16 @@ function step(){
       const b = nodes[j];
       const ox = (a.w + b.w) / 2 + 22 - Math.abs(b.x - a.x);
       const oy = (a.h + b.h) / 2 + 16 - Math.abs(b.y - a.y);
-      if (ox > 0 && oy > 0){
+      if (ox > 0 && oy > 0 && !(a.pinned && b.pinned)){
+        // a pinned node stays put; its neighbour takes the whole correction
+        const wa = a.pinned ? 0 : b.pinned ? 2 : 1;
+        const wb = b.pinned ? 0 : a.pinned ? 2 : 1;
         if (ox < oy){
           const s = (b.x >= a.x ? 1 : -1) * ox * 0.25;
-          a.x -= s; b.x += s;
+          a.x -= s * wa; b.x += s * wb;
         } else {
           const s = (b.y >= a.y ? 1 : -1) * oy * 0.25;
-          a.y -= s; b.y += s;
+          a.y -= s * wa; b.y += s * wb;
         }
       }
     }
@@ -403,6 +425,25 @@ function render(g, opts){
     g.strokeStyle = (opts.showSelection && n.id === selected) ? accentC : col;
     if (g.lineWidth) g.stroke();
 
+    if (opts.dropTarget === n.id){
+      path(g, x - 5, y - 5, n.w + 10, n.h + 10, r + 5);
+      g.setLineDash([6, 4]);
+      g.lineWidth = 2.5;
+      g.strokeStyle = accentC;
+      g.stroke();
+      g.setLineDash([]);
+    }
+
+    if (opts.showSelection && n.pinned && n !== dragging){
+      g.beginPath();
+      g.arc(x + n.w - r * 0.35, y + r * 0.35, 4, 0, Math.PI * 2);
+      g.fillStyle = accentC;
+      g.fill();
+      g.lineWidth = 1.5;
+      g.strokeStyle = panelC;
+      g.stroke();
+    }
+
     g.fillStyle = d === 0 ? "#fff" : inkC;
     g.font = FONT(weightFor(d));
     g.textAlign = "center";
@@ -426,12 +467,15 @@ function draw(){
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  render(ctx, { x: view.x, y: view.y, k: view.k, showSelection: true });
+  render(ctx, { x: view.x, y: view.y, k: view.k, showSelection: true, dropTarget: dropTarget && dropTarget.id });
 
   const sel = byId(selected);
   hintEl.textContent = nodes.length === 0
     ? "Type an idea and press Enter to create the central topic."
-    : "Adding under: “" + (sel ? sel.text : "—") + "”  ·  Enter = child · Shift+Enter = sibling · double-click = rename · drag = move · Del = remove · scroll = zoom";
+    : dragging && dragMoved
+    ? (dropTarget ? "Drop to place “" + dragging.text + "” under “" + dropTarget.text + "”"
+                  : "Drop on empty space to pin “" + dragging.text + "” here")
+    : "Adding under: “" + (sel ? sel.text : "—") + "”  ·  Enter = child · Shift+Enter = sibling · double-click = rename · drag onto a node = re-parent · drag elsewhere = pin · P = pin/unpin · Del = remove · scroll = zoom";
   statusEl.textContent = nodes.length + " node" + (nodes.length === 1 ? "" : "s") + " · " + Math.round(view.k * 100) + "%";
 }
 
@@ -446,11 +490,15 @@ function loop(){
 /* ---------------- interaction ---------------- */
 
 let dragging = null, dragDX = 0, dragDY = 0, panning = null;
+let dragStart = null, dragMoved = false, dragWasPinned = false;
+let dragSubtree = null;   // dragged node + descendants: never valid drop targets (would form a cycle)
+let dropTarget = null;
 
-function nodeAt(px, py){
+function nodeAt(px, py, skip){
   const w = toWorld(px, py);
   for (let i = nodes.length - 1; i >= 0; i--){
     const n = nodes[i];
+    if (skip && skip.has(n.id)) continue;
     if (Math.abs(w.x - n.x) <= n.w / 2 && Math.abs(w.y - n.y) <= n.h / 2) return n;
   }
   return null;
@@ -468,6 +516,10 @@ canvas.addEventListener("pointerdown", e => {
   if (n){
     selected = n.id;
     dragging = n;
+    dragStart = p; dragMoved = false;
+    dragWasPinned = n.pinned;
+    dragSubtree = subtreeIds(n.id);
+    dropTarget = null;
     n.pinned = true;
     const w = toWorld(p.x, p.y);
     dragDX = n.x - w.x; dragDY = n.y - w.y;
@@ -482,10 +534,14 @@ canvas.addEventListener("pointerdown", e => {
 canvas.addEventListener("pointermove", e => {
   const p = localPos(e);
   if (dragging){
+    // a few pixels of slack so a plain click selects without pinning
+    if (!dragMoved && Math.hypot(p.x - dragStart.x, p.y - dragStart.y) < 4) return;
+    dragMoved = true;
     const w = toWorld(p.x, p.y);
     dragging.x = w.x + dragDX;
     dragging.y = w.y + dragDY;
     dragging.vx = dragging.vy = 0;
+    dropTarget = nodeAt(p.x, p.y, dragSubtree);
     alpha = Math.max(alpha, 0.35);
   } else if (panning){
     view.tx = view.x = panning.vx + (p.x - panning.px);
@@ -495,13 +551,18 @@ canvas.addEventListener("pointermove", e => {
   }
 });
 
-function endPointer(){
-  if (dragging){ dragging.pinned = false; persist(); }
-  dragging = null; panning = null;
+function endPointer(cancelled){
+  if (dragging){
+    if (!dragMoved) dragging.pinned = dragWasPinned;          // just a click
+    else if (dropTarget && !cancelled) reparent(dragging, dropTarget);
+    else dragging.pinned = true;                              // stays exactly where it was dropped
+    persist();
+  }
+  dragging = null; dropTarget = null; dragSubtree = null; panning = null;
   canvas.style.cursor = "default";
 }
-canvas.addEventListener("pointerup", endPointer);
-canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("pointerup", () => endPointer(false));
+canvas.addEventListener("pointercancel", () => endPointer(true));
 
 canvas.addEventListener("dblclick", e => {
   const n = nodeAt(localPos(e).x, localPos(e).y);
@@ -552,6 +613,10 @@ document.addEventListener("keydown", e => {
   if ((e.key === "Delete" || e.key === "Backspace") && selected !== null){
     e.preventDefault();
     removeSubtree(selected);
+  }
+  if ((e.key === "p" || e.key === "P") && !e.ctrlKey && !e.metaKey && !e.altKey){
+    const n = byId(selected);
+    if (n){ e.preventDefault(); n.pinned = !n.pinned; alpha = Math.max(alpha, 0.5); persist(); }
   }
   if (e.key === "F2"){
     const n = byId(selected);
@@ -752,7 +817,10 @@ document.getElementById("png").onclick = () => {
 
 const serialize = () => ({
   version: 1, seq, selected,
-  nodes: nodes.map(n => ({ id: n.id, text: n.text, parent: n.parent, x: Math.round(n.x), y: Math.round(n.y) }))
+  nodes: nodes.map(n => Object.assign(
+    { id: n.id, text: n.text, parent: n.parent, x: Math.round(n.x), y: Math.round(n.y) },
+    n.pinned ? { pinned: true } : {}
+  ))
 });
 
 function persist(){
@@ -767,7 +835,7 @@ function hydrate(data){
     text: String(n.text == null ? "" : n.text),
     parent: n.parent == null ? null : n.parent,
     x: Number(n.x) || 0, y: Number(n.y) || 0,
-    vx: 0, vy: 0, w: 80, h: 32, pinned: false
+    vx: 0, vy: 0, w: 80, h: 32, pinned: n.pinned === true
   }));
   const ids = new Set(nodes.map(n => n.id));
   for (const n of nodes) if (n.parent !== null && !ids.has(n.parent)) n.parent = null;
