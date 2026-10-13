@@ -80,6 +80,49 @@
   .dlg img{max-width:100%;max-height:55vh;object-fit:contain;align-self:center;border:1px solid var(--line);border-radius:8px}
   .dlg .actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
   button.solid-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+
+  /* user manual: a full-screen panel inside this file, so it works wherever the app is hosted */
+  #manual{
+    position:fixed; inset:0; display:none; flex-direction:column; z-index:9;
+    background:var(--bg); color:var(--ink);
+  }
+  #manual.open{display:flex}
+  #manual > header{justify-content:space-between}
+  #manual > header h1{display:block}
+  #manualBody{flex:1 1 auto; overflow:auto; padding:24px 16px 48px}
+  .doc{max-width:760px; margin:0 auto; font-size:15px; line-height:1.6}
+  .doc h2{font-size:18px; margin:32px 0 8px; padding-top:8px; border-top:1px solid var(--line)}
+  .doc h2:first-of-type{border-top:0; margin-top:8px}
+  .doc h3{font-size:15px; margin:18px 0 4px}
+  .doc p, .doc ul, .doc ol{margin:6px 0 10px}
+  .doc li{margin:3px 0}
+  .doc .lead{font-size:16px; color:var(--muted)}
+  .doc .toc{
+    margin:16px 0 8px; padding:12px 16px; border:1px solid var(--line); border-radius:10px;
+    background:var(--panel); columns:2 220px; column-gap:24px; list-style:none;
+  }
+  .doc a{color:var(--accent)}
+  .doc .toc li{margin:0; padding:2px 0; break-inside:avoid}
+  .doc .toc a{text-decoration:none}
+  .doc .toc a:hover{text-decoration:underline}
+  .doc .note{
+    padding:10px 14px; border-left:3px solid var(--accent); border-radius:6px;
+    background:var(--panel); margin:12px 0;
+  }
+  .doc .btn{
+    display:inline-block; padding:0 7px; border:1px solid var(--line); border-radius:6px;
+    background:var(--panel); font-size:13px; white-space:nowrap;
+  }
+  .doc kbd{
+    display:inline-block; min-width:22px; padding:0 6px; text-align:center;
+    border:1px solid var(--line); border-bottom-width:2px; border-radius:5px;
+    background:var(--panel); font:12px/1.7 ui-monospace,Consolas,monospace; white-space:nowrap;
+  }
+  .doc table{width:100%; border-collapse:collapse; margin:8px 0 12px; font-size:14px}
+  .doc th, .doc td{text-align:left; vertical-align:top; padding:7px 10px; border-bottom:1px solid var(--line)}
+  .doc th{color:var(--muted); font-weight:600}
+  .doc td:first-child{white-space:nowrap; width:1%}
+  @media (max-width:640px){ .doc td:first-child{white-space:normal} }
 </style>
 </head>
 <body>
@@ -99,6 +142,8 @@
   <button id="load">Import</button>
   <button id="png">PNG</button>
   <button id="clear" class="danger">Clear</button>
+  <span class="sep"></span>
+  <button id="usage">Usage</button>
   <input type="file" id="file" accept="application/json" hidden>
 </header>
 
@@ -117,6 +162,199 @@
     <div class="actions" id="dlgActions"></div>
   </div>
 </div>
+
+<section id="manual" aria-labelledby="manualTitle">
+  <header>
+    <h1 id="manualTitle">User Manual</h1>
+    <button id="manualClose" class="primary">Back to the mind map</button>
+  </header>
+  <div id="manualBody">
+  <article class="doc">
+    <p class="lead">Mind Map lets you collect ideas and organise them as a tree: one central topic in the
+      middle, with branches and sub-branches around it. The layout arranges itself automatically, and you
+      can move anything by hand whenever you like.</p>
+
+    <ul class="toc">
+      <li><a href="#m-start">1. Getting started</a></li>
+      <li><a href="#m-screen">2. The screen</a></li>
+      <li><a href="#m-add">3. Adding ideas</a></li>
+      <li><a href="#m-edit">4. Renaming and deleting</a></li>
+      <li><a href="#m-move">5. Moving and re-arranging</a></li>
+      <li><a href="#m-pin">6. Pinning a node in place</a></li>
+      <li><a href="#m-view">7. Zooming and panning</a></li>
+      <li><a href="#m-save">8. Saving, sharing and images</a></li>
+      <li><a href="#m-keys">9. Keyboard shortcuts</a></li>
+      <li><a href="#m-sharepoint">10. Using the app from SharePoint</a></li>
+      <li><a href="#m-faq">11. Tips and troubleshooting</a></li>
+    </ul>
+
+    <h2 id="m-start">1. Getting started</h2>
+    <p>The first time you open the app you see a small example map. To start your own:</p>
+    <ol>
+      <li>Click <span class="btn">Clear</span> and confirm with <span class="btn">Delete all</span>.</li>
+      <li>Type your main topic into the text field at the top and press <kbd>Enter</kbd>.
+        This becomes the <strong>central topic</strong> (the filled bubble in the middle).</li>
+      <li>Keep typing ideas and pressing <kbd>Enter</kbd> – each one is added as a branch of the
+        selected node.</li>
+    </ol>
+    <p>Everything you do is saved automatically in your browser, so the map is still there the next time
+      you open the app on the same computer and browser (see <a href="#m-save">Saving</a>).</p>
+
+    <h2 id="m-screen">2. The screen</h2>
+    <ul>
+      <li><strong>Toolbar</strong> (top): the text field for new ideas and all buttons.</li>
+      <li><strong>Map</strong> (middle): your ideas as bubbles connected by lines. The central topic is a
+        filled bubble; each main branch gets its own colour, which all of its sub-ideas share.</li>
+      <li><strong>Hint line</strong> (bottom left): shows which node new ideas will be added under,
+        and what will happen while you drag something.</li>
+      <li><strong>Status</strong> (bottom right): number of nodes and the current zoom level.</li>
+    </ul>
+    <p>The <strong>selected</strong> node has a blue outline. Click any node to select it.</p>
+
+    <h2 id="m-add">3. Adding ideas</h2>
+    <table>
+      <tr><th>To add…</th><th>Do this</th></tr>
+      <tr><td>A sub-idea (child)</td><td>Select the parent node, type the text, press <kbd>Enter</kbd>
+        or click <span class="btn">Add</span>.</td></tr>
+      <tr><td>An idea at the same level (sibling)</td><td>Select a node, type the text, press
+        <kbd>Shift</kbd>+<kbd>Enter</kbd> or click <span class="btn">Add sibling</span>.</td></tr>
+    </table>
+    <p>After adding, the new node becomes the selected one, so you can keep typing to go deeper. Click a
+      different node first to add somewhere else. The hint line always tells you where the next idea will
+      go (“Adding under: …”).</p>
+    <div class="note">Adding a sibling to the central topic creates a second, independent central topic.
+      Several topics are arranged in a ring.</div>
+
+    <h2 id="m-edit">4. Renaming and deleting</h2>
+    <h3>Rename a node</h3>
+    <p>Double-click it, or select it and press <kbd>F2</kbd> or click <span class="btn">Rename</span>.
+      Type the new text, then press <kbd>Enter</kbd> (or click elsewhere) to keep it, or <kbd>Esc</kbd>
+      to cancel.</p>
+    <h3>Delete a node</h3>
+    <p>Select it and press <kbd>Delete</kbd> (or <kbd>Backspace</kbd>), or click
+      <span class="btn">Delete</span>. <strong>Deleting a node also deletes all of its sub-ideas.</strong>
+      There is no undo, so export a copy first if you are unsure.</p>
+    <h3>Start over</h3>
+    <p><span class="btn">Clear</span> removes the whole map after asking you to confirm.</p>
+
+    <h2 id="m-move">5. Moving and re-arranging</h2>
+    <h3>Move a node to a different parent</h3>
+    <ol>
+      <li>Hold <kbd>Shift</kbd> and drag the node onto the node it should belong to.</li>
+      <li>The target gets a <strong>dashed blue ring</strong> and the hint line says
+        “Drop to place … under …”.</li>
+      <li>Let go. The node – together with all of its sub-ideas – now belongs to the new parent and takes
+        on that branch's colour.</li>
+    </ol>
+    <p>Why <kbd>Shift</kbd>? Without it, a dragged node pushes other nodes out of its way, so it is hard
+      to land on one. With <kbd>Shift</kbd> held, it glides over them. You can press or release
+      <kbd>Shift</kbd> at any time during the drag.</p>
+    <div class="note">You cannot drop a node onto one of its own sub-ideas – that would create a loop,
+      so those nodes are simply not offered as targets.</div>
+    <h3>Tidy up the layout</h3>
+    <p><span class="btn">Re-layout</span> scatters all nodes and lets the map arrange itself afresh.
+      This also releases every pinned node (see next section).</p>
+
+    <h2 id="m-pin">6. Pinning a node in place</h2>
+    <p>Normally the map arranges itself: nodes keep a comfortable distance from each other and stay close
+      to their parent. If you want a node somewhere specific:</p>
+    <ul>
+      <li><strong>Drag it to an empty spot and let go.</strong> It is pinned there and will not move on
+        its own any more. Pinned nodes show a small <strong>blue dot</strong> in the top-right corner.</li>
+      <li>Other nodes move out of a pinned node's way, never the other way round.</li>
+    </ul>
+    <p>To release a pinned node, do one of the following:</p>
+    <ul>
+      <li>Select it and press <kbd>P</kbd> (the same key pins a selected node, too).</li>
+      <li>Drag it back onto its parent (or any other node) – it rejoins the automatic layout there.</li>
+      <li>Click <span class="btn">Re-layout</span> to release all pins at once.</li>
+    </ul>
+    <p>A simple click only selects a node; it does not pin it.</p>
+
+    <h2 id="m-view">7. Zooming and panning</h2>
+    <ul>
+      <li><strong>Zoom:</strong> scroll the mouse wheel over the map. Zooming centres on the mouse
+        pointer.</li>
+      <li><strong>Pan:</strong> drag on an empty area of the map.</li>
+      <li><span class="btn">Fit to screen</span> zooms so the whole map is visible, and keeps it fitted
+        while the layout settles. As soon as you zoom, pan or drag yourself, the app stops auto-fitting
+        until you click the button again (or add a new idea).</li>
+    </ul>
+    <p>Long labels are shortened with “…” on screen; the full text is kept and shown when you rename the
+      node.</p>
+
+    <h2 id="m-save">8. Saving, sharing and images</h2>
+    <h3>Automatic saving</h3>
+    <p>Every change is saved straight away <strong>in your browser on this computer</strong>. Nothing is
+      sent to a server. This means:</p>
+    <ul>
+      <li>Your map is not visible to anyone else, and not available on another computer or browser.</li>
+      <li>Clearing your browser data, or using a private window, removes it.</li>
+      <li>The app holds <strong>one map at a time</strong>. To work on several, export each one to a file.</li>
+    </ul>
+    <h3>Export (save to a file)</h3>
+    <p><span class="btn">Export</span> saves the map as a <code>mindmap.json</code> file. Keep it as a
+      backup, store it on a shared drive, or send it to a colleague.</p>
+    <h3>Import (open a file)</h3>
+    <p><span class="btn">Import</span> loads a previously exported <code>.json</code> file.
+      <strong>This replaces the map that is currently open</strong> – export it first if you want to keep
+      it. Positions and pins are restored exactly as they were.</p>
+    <h3>Picture of the map</h3>
+    <p><span class="btn">PNG</span> saves an image of the whole map (not just the visible part) as
+      <code>mindmap.png</code>, ready to paste into a document, e-mail or presentation.</p>
+
+    <h2 id="m-keys">9. Keyboard shortcuts</h2>
+    <p>Shortcuts that act on the selected node work when you are not typing in the text field –
+      click the map first.</p>
+    <table>
+      <tr><th>Key</th><th>Action</th></tr>
+      <tr><td><kbd>Enter</kbd></td><td>In the text field: add the text as a child of the selected node</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>In the text field: add the text as a sibling</td></tr>
+      <tr><td><kbd>F2</kbd> / double-click</td><td>Rename the selected node</td></tr>
+      <tr><td><kbd>Enter</kbd> / <kbd>Esc</kbd></td><td>While renaming: keep / cancel the change</td></tr>
+      <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Delete the selected node and its sub-ideas</td></tr>
+      <tr><td><kbd>P</kbd></td><td>Pin or release the selected node</td></tr>
+      <tr><td><kbd>Shift</kbd> + drag</td><td>Drag over other nodes to drop onto one (change parent)</td></tr>
+      <tr><td>Mouse wheel</td><td>Zoom in / out</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close this manual or an open dialog</td></tr>
+    </table>
+
+    <h2 id="m-sharepoint">10. Using the app from SharePoint</h2>
+    <p>When the app is opened directly from a SharePoint document library, SharePoint shows it in a
+      restricted viewer that does not allow downloads. The app notices this and adapts:</p>
+    <ul>
+      <li><span class="btn">Export</span> shows the map as text. Click <span class="btn">Copy</span>,
+        paste it into Notepad and save the file with a <code>.json</code> ending. You can also try
+        <span class="btn">Try download</span>.</li>
+      <li><span class="btn">Import</span> lets you either choose a file or paste exported text into the
+        box and click <span class="btn">Load</span>.</li>
+      <li><span class="btn">PNG</span> shows the image. Right-click it and choose
+        “Save image as…” or “Copy image”.</li>
+    </ul>
+    <div class="note">The SharePoint viewer may also not keep your map between visits. Export before
+      closing it. If your organisation provides a direct web link to the app, prefer that – everything
+      works normally there.</div>
+
+    <h2 id="m-faq">11. Tips and troubleshooting</h2>
+    <h3>My new idea was added in the wrong place.</h3>
+    <p>It goes under the selected node (shown in the hint line). Hold <kbd>Shift</kbd> and drag it onto
+      the right parent, or delete it, select the correct parent and add it again.</p>
+    <h3>I can't drop a node onto another one – the target moves away.</h3>
+    <p>Hold <kbd>Shift</kbd> while dragging.</p>
+    <h3>A node won't move back into the layout.</h3>
+    <p>It is pinned (blue dot). Select it and press <kbd>P</kbd>, or click
+      <span class="btn">Re-layout</span>.</p>
+    <h3>Pressing Delete or P does nothing.</h3>
+    <p>The cursor is probably still in the text field at the top. Click on the map, then try again.</p>
+    <h3>My map is gone.</h3>
+    <p>Maps are stored per browser. Check that you are using the same computer and browser, and not a
+      private window. If browser data was cleared, import your last exported file. Export regularly to be
+      safe.</p>
+    <h3>The map is too big to see.</h3>
+    <p>Click <span class="btn">Fit to screen</span>.</p>
+  </article>
+  </div>
+</section>
 
 <script>
 (() => {
@@ -244,12 +482,15 @@ function linkDistance(a, b){
 function step(){
   if (alpha < 0.005 || nodes.length === 0) return;
   const n = nodes.length;
+  // a Shift-drag passes over other nodes instead of shoving them away, so it can be dropped onto them
+  const ghost = dragging && dragMoved && shiftHeld ? dragging : null;
 
   // repulsion between every pair, scaled by node size
   for (let i = 0; i < n; i++){
     const a = nodes[i];
     for (let j = i + 1; j < n; j++){
       const b = nodes[j];
+      if (a === ghost || b === ghost) continue;
       let dx = b.x - a.x, dy = b.y - a.y;
       let d2 = dx * dx + dy * dy;
       if (d2 < 0.01){ dx = Math.random() - .5; dy = Math.random() - .5; d2 = 0.01; }
@@ -280,6 +521,7 @@ function step(){
     const a = nodes[i];
     for (let j = i + 1; j < n; j++){
       const b = nodes[j];
+      if (a === ghost || b === ghost) continue;
       const ox = (a.w + b.w) / 2 + 22 - Math.abs(b.x - a.x);
       const oy = (a.h + b.h) / 2 + 16 - Math.abs(b.y - a.y);
       if (ox > 0 && oy > 0 && !(a.pinned && b.pinned)){
@@ -475,7 +717,8 @@ function draw(){
     : dragging && dragMoved
     ? (dropTarget ? "Drop to place “" + dragging.text + "” under “" + dropTarget.text + "”"
                   : "Drop on empty space to pin “" + dragging.text + "” here")
-    : "Adding under: “" + (sel ? sel.text : "—") + "”  ·  Enter = child · Shift+Enter = sibling · double-click = rename · drag onto a node = re-parent · drag elsewhere = pin · P = pin/unpin · Del = remove · scroll = zoom";
+      + (shiftHeld ? "" : "  ·  hold Shift to pass over other nodes")
+    : "Adding under: “" + (sel ? sel.text : "—") + "”  ·  Enter = child · Shift+Enter = sibling · double-click = rename · drag onto a node = re-parent (hold Shift to pass over nodes) · drag elsewhere = pin · P = pin/unpin · Del = remove · scroll = zoom";
   statusEl.textContent = nodes.length + " node" + (nodes.length === 1 ? "" : "s") + " · " + Math.round(view.k * 100) + "%";
 }
 
@@ -493,6 +736,11 @@ let dragging = null, dragDX = 0, dragDY = 0, panning = null;
 let dragStart = null, dragMoved = false, dragWasPinned = false;
 let dragSubtree = null;   // dragged node + descendants: never valid drop targets (would form a cycle)
 let dropTarget = null;
+let shiftHeld = false;
+// track Shift on its own too, so pressing it mid-drag works without moving the mouse
+window.addEventListener("keydown", e => { if (e.key === "Shift") shiftHeld = true; });
+window.addEventListener("keyup", e => { if (e.key === "Shift") shiftHeld = false; });
+window.addEventListener("blur", () => { shiftHeld = false; });
 
 function nodeAt(px, py, skip){
   const w = toWorld(px, py);
@@ -533,6 +781,7 @@ canvas.addEventListener("pointerdown", e => {
 
 canvas.addEventListener("pointermove", e => {
   const p = localPos(e);
+  shiftHeld = e.shiftKey;
   if (dragging){
     // a few pixels of slack so a plain click selects without pinning
     if (!dragMoved && Math.hypot(p.x - dragStart.x, p.y - dragStart.y) < 4) return;
@@ -609,7 +858,8 @@ editor.addEventListener("blur", () => hideEditor(true));
 
 /* keyboard */
 document.addEventListener("keydown", e => {
-  if (closeDialog || document.activeElement === textInput || document.activeElement === editor) return;
+  if (closeDialog || manual.classList.contains("open") ||
+      document.activeElement === textInput || document.activeElement === editor) return;
   if ((e.key === "Delete" || e.key === "Backspace") && selected !== null){
     e.preventDefault();
     removeSubtree(selected);
@@ -702,6 +952,36 @@ async function copyText(ta){
   try{ await navigator.clipboard.writeText(ta.value); return true; }catch(e){ /* blocked by permissions policy */ }
   try{ return document.execCommand("copy"); }catch(e){ return false; }
 }
+
+/* ---------------- user manual ---------------- */
+
+const manual = document.getElementById("manual");
+const manualBody = document.getElementById("manualBody");
+const manualClose = document.getElementById("manualClose");
+
+function openManual(){
+  hideEditor(true);
+  manual.classList.add("open");
+  manualBody.scrollTop = 0;
+  manualClose.focus();
+}
+function closeManual(){
+  manual.classList.remove("open");
+  textInput.focus();
+}
+document.getElementById("usage").onclick = openManual;
+manualClose.onclick = closeManual;
+manual.addEventListener("keydown", e => {
+  if (e.key === "Escape"){ e.preventDefault(); closeManual(); }
+});
+// scroll in-page links ourselves instead of changing the URL hash, which embedded viewers may not handle
+manual.addEventListener("click", e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  e.preventDefault();
+  const target = document.getElementById(a.getAttribute("href").slice(1));
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 /* ---------------- toolbar: file actions ---------------- */
 
